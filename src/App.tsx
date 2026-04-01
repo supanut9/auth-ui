@@ -1,12 +1,21 @@
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
-import './App.css'
-import { appConfig } from './config'
-import type {
-  FlowActionResult,
-  FlowContext,
-  FlowStage,
-} from './flow'
+import { useEffect, useState } from "react"
+import type { ReactNode } from "react"
+import {
+  ArrowRight,
+  Bug,
+  CheckCircle2,
+  GitBranch,
+  Globe2,
+  KeyRound,
+  LockKeyhole,
+  LogOut,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react"
+
+import { appConfig } from "./config"
+import type { FlowActionResult, FlowContext, FlowStage } from "./flow"
 import {
   acceptConsent,
   globalLogout,
@@ -18,60 +27,82 @@ import {
   startGoogleLogin,
   startOtp,
   verifyOtp,
-} from './flow'
-import { getUiRoute, type UiRoute } from './routes'
+} from "./flow"
+import { getUiRoute, type UiRoute } from "./routes"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 
 type FlowPanelState =
-  | {
-      status: 'loading'
-      flow: null
-      error: null
-    }
-  | {
-      status: 'ready'
-      flow: FlowContext | null
-      error: null
-    }
-  | {
-      status: 'error'
-      flow: null
-      error: string
-    }
+  | { status: "loading"; flow: null; error: null }
+  | { status: "ready"; flow: FlowContext | null; error: null }
+  | { status: "error"; flow: null; error: string }
 
-type StageView = 'login' | 'consent' | 'otp' | 'transition' | 'error'
+type StageView = "login" | "consent" | "otp" | "transition" | "error"
 
 function App() {
   const route = getUiRoute(window.location.pathname)
   const searchParams = new URLSearchParams(window.location.search)
-  const requestId = searchParams.get('request_id') ?? ''
-  const emailParam = searchParams.get('email') ?? ''
+  const requestId = searchParams.get("request_id") ?? ""
+  const emailParam = searchParams.get("email") ?? ""
 
   return (
-    <main className="app-shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <p className="eyebrow">Hosted auth UI</p>
-          <h1>{appConfig.appName}</h1>
-          <p className="lede">
-            Route-driven login, consent, OTP, and logout pages for the centralized
-            authorization server.
-          </p>
-        </div>
-
-        <div className="hero-meta">
-          <span>Auth server</span>
-          <strong>{appConfig.authServerUrl}</strong>
-          <span>Auth UI</span>
-          <strong>{appConfig.authUiUrl}</strong>
-          <span>Request</span>
-          <strong>{requestId || 'none'}</strong>
-        </div>
-      </section>
-
-      <section className="page-panel">
+    <main className="mx-auto flex min-h-screen max-w-7xl flex-col justify-center gap-6 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+        <HeroPanel />
         <AuthPage route={route} requestId={requestId} emailParam={emailParam} />
       </section>
+      <FooterBand />
+      <DevPanel requestId={requestId} />
     </main>
+  )
+}
+
+function HeroPanel() {
+  return (
+    <Card className="relative overflow-hidden border-white/80 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.26),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.16),transparent_28%),linear-gradient(140deg,rgba(255,255,255,0.95),rgba(255,250,240,0.86))]">
+      <CardContent className="flex h-full flex-col justify-between p-8 sm:p-10">
+        <div className="max-w-2xl space-y-6">
+          <Badge className="w-fit">Secure sign in</Badge>
+          <div className="space-y-3">
+            <h1 className="max-w-xl text-5xl font-semibold tracking-[-0.045em] text-slate-950 sm:text-6xl">
+              {appConfig.appName}
+            </h1>
+            <p className="max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
+              A calm, trusted sign-in surface for account access, consent, and email verification.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Pill icon={<ShieldCheck className="size-4" />} label="Private by default" />
+            <Pill icon={<Mail className="size-4" />} label="Email verification" />
+            <Pill icon={<Sparkles className="size-4" />} label="Fast repeat sign-in" />
+          </div>
+
+          <div className="grid gap-4 pt-2 sm:grid-cols-2">
+            <PromiseCard
+              icon={<LockKeyhole className="size-4" />}
+              title="Central session"
+              text="Once you're signed in, trusted sessions can move faster without asking for credentials again."
+            />
+            <PromiseCard
+              icon={<Globe2 className="size-4" />}
+              title="One surface"
+              text="Every step keeps the same tone and layout, so the flow feels consistent from sign-in to approval."
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -83,7 +114,9 @@ type AuthPageProps = {
 
 function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
   const [panelState, setPanelState] = useState<FlowPanelState>(() =>
-    requestId ? { status: 'loading', flow: null, error: null } : { status: 'ready', flow: null, error: null },
+    requestId
+      ? { status: "loading", flow: null, error: null }
+      : { status: "ready", flow: null, error: null },
   )
   const [message, setMessage] = useState<string | null>(null)
 
@@ -92,22 +125,20 @@ function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
 
     async function run() {
       if (!requestId) {
-        setPanelState({ status: 'ready', flow: null, error: null })
+        setPanelState({ status: "ready", flow: null, error: null })
         return
       }
 
-      setPanelState({ status: 'loading', flow: null, error: null })
+      setPanelState({ status: "loading", flow: null, error: null })
       const result = await loadFlowContext(requestId)
-      if (!active) {
-        return
-      }
+      if (!active) return
 
       if (result.ok) {
-        setPanelState({ status: 'ready', flow: result.flow, error: null })
+        setPanelState({ status: "ready", flow: result.flow, error: null })
         return
       }
 
-      setPanelState({ status: 'error', flow: null, error: result.message })
+      setPanelState({ status: "error", flow: null, error: result.message })
     }
 
     void run()
@@ -117,64 +148,54 @@ function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
     }
   }, [requestId])
 
-  if (panelState.status === 'loading') {
+  if (panelState.status === "loading") {
     return (
-      <CardShell
+      <ShellCard
         route={route}
         title="Loading"
-        subtitle="Fetching flow context from auth-server."
+        subtitle="Preparing your sign-in experience."
         requestId={requestId}
       >
-        <p className="hint">This page is waiting for the pending authorization request.</p>
-      </CardShell>
+        <EmptyHint>
+          One moment while we load the next step.
+        </EmptyHint>
+      </ShellCard>
     )
   }
 
-  if (panelState.status === 'error') {
-    return (
-      <ErrorPage
-        flow={null}
-        requestId={requestId}
-        detail={panelState.error}
-      />
-    )
+  if (panelState.status === "error") {
+    return <ErrorPage flow={null} requestId={requestId} detail={panelState.error} />
   }
 
   const flow = panelState.flow
 
-  if (route === '/logout') {
+  if (route === "/logout") {
     return <LogoutPage requestId={requestId} global={false} setMessage={setMessage} />
   }
 
-  if (route === '/logout/global') {
+  if (route === "/logout/global") {
     return <LogoutPage requestId={requestId} global setMessage={setMessage} />
   }
 
-  if (route === '/error') {
-    return (
-      <ErrorPage
-        flow={flow}
-        requestId={requestId}
-        detail={message}
-      />
-    )
+  if (route === "/error") {
+    return <ErrorPage flow={flow} requestId={requestId} detail={message} />
   }
 
   switch (getStageView(flow?.stage, route)) {
-    case 'consent':
+    case "consent":
       return (
         <ConsentPage
-          key={flow?.request_id || requestId || 'consent'}
+          key={flow?.request_id || requestId || "consent"}
           flow={flow}
           requestId={requestId}
           message={message}
           setMessage={setMessage}
         />
       )
-    case 'otp':
+    case "otp":
       return (
         <OtpPage
-          key={flow?.request_id || requestId || 'otp'}
+          key={flow?.request_id || requestId || "otp"}
           flow={flow}
           requestId={requestId}
           emailParam={emailParam}
@@ -182,21 +203,15 @@ function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
           setMessage={setMessage}
         />
       )
-    case 'transition':
+    case "transition":
       return <TransitionPage flow={flow} requestId={requestId} />
-    case 'error':
-      return (
-        <ErrorPage
-          flow={flow}
-          requestId={requestId}
-          detail={message}
-        />
-      )
-    case 'login':
+    case "error":
+      return <ErrorPage flow={flow} requestId={requestId} detail={message} />
+    case "login":
     default:
       return (
         <LoginPage
-          key={flow?.request_id || requestId || 'login'}
+          key={flow?.request_id || requestId || "login"}
           flow={flow}
           requestId={requestId}
           message={message}
@@ -208,23 +223,23 @@ function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
 
 function getStageView(stage: FlowStage | undefined, route: UiRoute): StageView {
   if (!stage) {
-    return route === '/consent' ? 'consent' : route === '/otp' ? 'otp' : 'login'
+    return route === "/consent" ? "consent" : route === "/otp" ? "otp" : "login"
   }
 
   switch (stage) {
-    case 'login_required':
-      return 'login'
-    case 'provider_redirect':
-    case 'authorization_ready':
-    case 'completed':
-      return 'transition'
-    case 'otp_required':
-      return 'otp'
-    case 'consent_required':
-      return 'consent'
-    case 'failed':
-    case 'expired':
-      return 'error'
+    case "login_required":
+      return "login"
+    case "provider_redirect":
+    case "authorization_ready":
+    case "completed":
+      return "transition"
+    case "otp_required":
+      return "otp"
+    case "consent_required":
+      return "consent"
+    case "failed":
+    case "expired":
+      return "error"
   }
 }
 
@@ -239,166 +254,186 @@ type FlowMessageProps = {
 }
 
 function LoginPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
-  const [email, setEmail] = useState(flow?.otp.masked_email ?? '')
-  const [busy, setBusy] = useState<'google' | 'github' | 'otp' | null>(null)
+  const [email, setEmail] = useState("")
+  const [busy, setBusy] = useState<"google" | "github" | "otp" | null>(null)
 
-  const loginMethods = flow?.available_login_methods ?? ['google', 'github', 'email_otp']
+  const loginMethods = flow?.available_login_methods ?? ["google", "github", "email_otp"]
   const canAct = Boolean(requestId)
 
   return (
-    <CardShell
+    <ShellCard
       route="/login"
-      title={flow ? flow.client.display_name : 'Login'}
-      subtitle="Choose a login method for the pending authorization request."
+      title={flow ? `Continue to ${flow.client.display_name}` : "Sign in"}
+      subtitle="Choose the account you want to use."
       requestId={requestId}
       flow={flow}
       message={message}
     >
       {!canAct && (
-        <p className="hint">
-          A `request_id` is required. Start the flow from auth-server so this page can load
-          the pending authorization context.
-        </p>
+        <EmptyHint>
+          Start from the application you were signing in to so this page can load properly.
+        </EmptyHint>
       )}
 
-      <ActionGroup>
-        {loginMethods.includes('google') && (
-          <ActionButton
-            label="Continue with Google"
-            busy={busy === 'google'}
+      <div className="grid gap-3">
+        {loginMethods.includes("google") && (
+          <Button
+            size="lg"
+            className="justify-between rounded-2xl bg-slate-950 px-5 text-left"
             disabled={!canAct}
             onClick={async () => {
-              if (!canAct) {
-                setMessage('Missing request_id.')
-                return
-              }
+              if (!canAct) return setMessage("Missing request_id.")
               setMessage(null)
-              setBusy('google')
+              setBusy("google")
               const result = await startGoogleLogin(requestId)
               setBusy(null)
               handleActionResult(result, setMessage)
             }}
-          />
+          >
+            <span className="flex items-center gap-3">
+              <GoogleGlyph />
+              Sign in with Google
+            </span>
+            {busy === "google" ? "Working..." : <ArrowRight className="size-4" />}
+          </Button>
         )}
 
-        {loginMethods.includes('github') && (
-          <ActionButton
-            label="Continue with GitHub"
-            busy={busy === 'github'}
+        {loginMethods.includes("github") && (
+          <Button
+            size="lg"
+            variant="outline"
+            className="justify-between rounded-2xl border-slate-300 bg-white/90 px-5 text-left"
             disabled={!canAct}
             onClick={async () => {
-              if (!canAct) {
-                setMessage('Missing request_id.')
-                return
-              }
+              if (!canAct) return setMessage("Missing request_id.")
               setMessage(null)
-              setBusy('github')
+              setBusy("github")
               const result = await startGitHubLogin(requestId)
               setBusy(null)
               handleActionResult(result, setMessage)
             }}
-          />
+          >
+            <span className="flex items-center gap-3">
+              <GitBranch className="size-5" />
+              Sign in with GitHub
+            </span>
+            {busy === "github" ? "Working..." : <ArrowRight className="size-4" />}
+          </Button>
         )}
-      </ActionGroup>
+      </div>
 
-      {loginMethods.includes('email_otp') && (
-        <form
-          className="inline-form"
-          onSubmit={async (event) => {
-            event.preventDefault()
-            if (!canAct) {
-              setMessage('Missing request_id.')
-              return
-            }
-            setMessage(null)
-            setBusy('otp')
-            const result = await startOtp(requestId, email.trim())
-            setBusy(null)
-            if (result.ok && !result.authorizationUrl && !result.redirectTo) {
-              setMessage('Verification code sent. Enter the code on the OTP page.')
-              window.location.assign(
-                `${appConfig.authUiUrl}/otp?request_id=${encodeURIComponent(requestId)}&email=${encodeURIComponent(email.trim())}`,
-              )
-              return
-            }
-            handleActionResult(result, setMessage)
-          }}
-        >
-          <label>
-            Email for OTP recovery or native login
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="name@example.com"
-              disabled={!canAct}
+      {loginMethods.includes("email_otp") && (
+        <>
+          <Separator className="my-6" />
+          <form
+            className="space-y-4"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              if (!canAct) return setMessage("Missing request_id.")
+              setMessage(null)
+              setBusy("otp")
+              const result = await startOtp(requestId, email.trim())
+              setBusy(null)
+              if (result.ok && !result.authorizationUrl && !result.redirectTo) {
+                setMessage("Verification code sent. Enter the code on the OTP page.")
+                window.location.assign(
+                  `${appConfig.authUiUrl}/otp?request_id=${encodeURIComponent(requestId)}&email=${encodeURIComponent(email.trim())}`,
+                )
+                return
+              }
+              handleActionResult(result, setMessage)
+            }}
+          >
+            <FieldLabel
+              title="Email OTP"
+              description="Get a one-time code by email to continue without using a social login."
             />
-          </label>
-          <ActionButton label="Send OTP" busy={busy === 'otp'} disabled={!canAct} type="submit" />
-        </form>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="name@example.com"
+                disabled={!canAct}
+                className="flex-1"
+              />
+              <Button
+                type="submit"
+                size="lg"
+                className="rounded-2xl px-5 sm:w-auto"
+                disabled={!canAct}
+              >
+                {busy === "otp" ? "Sending..." : "Send OTP"}
+              </Button>
+            </div>
+          </form>
+        </>
       )}
-    </CardShell>
+    </ShellCard>
   )
 }
 
 function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
-  const [busy, setBusy] = useState<'accept' | 'reject' | null>(null)
+  const [busy, setBusy] = useState<"accept" | "reject" | null>(null)
   const canAct = Boolean(requestId)
 
   return (
-    <CardShell
+    <ShellCard
       route="/consent"
-      title={flow ? flow.client.display_name : 'Consent'}
-      subtitle="Review requested scopes before the authorization code is issued."
+      title={flow ? `${flow.client.display_name} needs your approval` : "Review access"}
+      subtitle="Check what this app is asking to access before continuing."
       requestId={requestId}
       flow={flow}
       message={message}
     >
       {!canAct && (
-        <p className="hint">
-          A `request_id` is required. Open the consent page from the pending authorization
-          flow.
-        </p>
+        <EmptyHint>
+          Open this page from the active sign-in flow so approval can be submitted safely.
+        </EmptyHint>
       )}
 
-      <ScopeList scopes={flow?.requested_scopes ?? []} />
+      <div className="space-y-5">
+        <div className="rounded-3xl border border-border/70 bg-secondary/35 p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck className="size-4 text-primary" />
+            <span className="text-sm font-medium text-slate-800">What this app can access</span>
+          </div>
+          <ScopeList scopes={flow?.requested_scopes ?? []} />
+        </div>
 
-      <ActionRow>
-        <ActionButton
-          label="Approve"
-          busy={busy === 'accept'}
-          disabled={!canAct}
-          onClick={async () => {
-            if (!canAct) {
-              setMessage('Missing request_id.')
-              return
-            }
-            setMessage(null)
-            setBusy('accept')
-            const result = await acceptConsent(requestId)
-            setBusy(null)
-            handleActionResult(result, setMessage)
-          }}
-        />
-        <ActionButton
-          label="Reject"
-          secondary
-          busy={busy === 'reject'}
-          disabled={!canAct}
-          onClick={async () => {
-            if (!canAct) {
-              setMessage('Missing request_id.')
-              return
-            }
-            setMessage(null)
-            setBusy('reject')
-            const result = await rejectConsent(requestId)
-            setBusy(null)
-            handleActionResult(result, setMessage)
-          }}
-        />
-      </ActionRow>
-    </CardShell>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            size="lg"
+            disabled={!canAct}
+            onClick={async () => {
+              if (!canAct) return setMessage("Missing request_id.")
+              setMessage(null)
+              setBusy("accept")
+              const result = await acceptConsent(requestId)
+              setBusy(null)
+              handleActionResult(result, setMessage)
+            }}
+          >
+            {busy === "accept" ? "Approving..." : "Allow access"}
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            disabled={!canAct}
+            onClick={async () => {
+              if (!canAct) return setMessage("Missing request_id.")
+              setMessage(null)
+              setBusy("reject")
+              const result = await rejectConsent(requestId)
+              setBusy(null)
+              handleActionResult(result, setMessage)
+            }}
+          >
+            {busy === "reject" ? "Rejecting..." : "Cancel"}
+          </Button>
+        </div>
+      </div>
+    </ShellCard>
   )
 }
 
@@ -412,92 +447,96 @@ function OtpPage({
   FlowMessageProps & {
     emailParam: string
   }) {
-  const [email, setEmail] = useState(emailParam || '')
-  const [code, setCode] = useState('')
-  const [busy, setBusy] = useState<'verify' | 'resend' | null>(null)
+  const [email, setEmail] = useState(emailParam || "")
+  const [code, setCode] = useState("")
+  const [busy, setBusy] = useState<"verify" | "resend" | null>(null)
   const canAct = Boolean(requestId)
 
   return (
-    <CardShell
+    <ShellCard
       route="/otp"
-      title="Email OTP"
-      subtitle="Verify the email-based one-time password used for login or recovery."
+      title="Check your email"
+      subtitle="Enter the one-time code we sent to continue."
       requestId={requestId}
       flow={flow}
       message={message}
     >
-      {!canAct && (
-        <p className="hint">
-          A `request_id` is required. Open the OTP page from the pending authorization flow.
-        </p>
-      )}
+      <div className="mb-6 rounded-3xl border border-amber-200/70 bg-amber-50/80 p-5">
+        <div className="flex items-start gap-3">
+          <div className="rounded-2xl bg-amber-100 p-2 text-amber-900">
+            <KeyRound className="size-5" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-amber-950">Check your inbox</p>
+            <p className="text-sm leading-6 text-amber-900/85">
+              Use the latest code we sent. If you ask for another one, earlier codes stop working.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <form
-        className="inline-form"
+        className="space-y-4"
         onSubmit={async (event) => {
           event.preventDefault()
-          if (!canAct) {
-            setMessage('Missing request_id.')
-            return
-          }
+          if (!canAct) return setMessage("Missing request_id.")
           setMessage(null)
-          setBusy('verify')
+          setBusy("verify")
           const result = await verifyOtp(requestId, email.trim(), code.trim())
           setBusy(null)
           handleActionResult(result, setMessage)
         }}
       >
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="name@example.com"
+        <div className="space-y-4">
+          <LabeledField title="Email">
+            <Input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="name@example.com"
+              disabled={!canAct}
+            />
+          </LabeledField>
+
+          <LabeledField title="OTP code">
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="123456"
+              disabled={!canAct}
+            />
+          </LabeledField>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button type="submit" size="lg" disabled={!canAct}>
+            {busy === "verify" ? "Verifying..." : "Continue"}
+          </Button>
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
             disabled={!canAct}
-          />
-        </label>
-        <label>
-          OTP Code
-          <input
-            type="text"
-            inputMode="numeric"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-            placeholder="123456"
-            disabled={!canAct}
-          />
-        </label>
-        <ActionRow>
-          <ActionButton label="Verify" busy={busy === 'verify'} disabled={!canAct} type="submit" />
-          <ActionButton
-          label="Resend"
-          secondary
-          busy={busy === 'resend'}
-          disabled={!canAct}
-          onClick={async () => {
-              if (!canAct) {
-                setMessage('Missing request_id.')
-                return
-              }
+            onClick={async () => {
+              if (!canAct) return setMessage("Missing request_id.")
               setMessage(null)
-              setBusy('resend')
+              setBusy("resend")
               const result = await resendOtp(requestId, email.trim())
               setBusy(null)
               if (result.ok && !result.authorizationUrl && !result.redirectTo) {
-                setMessage('Verification code resent.')
+                setMessage("Verification code resent.")
                 return
               }
               handleActionResult(result, setMessage)
             }}
-          />
-        </ActionRow>
+          >
+            {busy === "resend" ? "Resending..." : "Send another code"}
+          </Button>
+        </div>
       </form>
-
-      <p className="hint">
-        This page is driven by the pending request state returned from auth-server.
-      </p>
-    </CardShell>
+    </ShellCard>
   )
 }
 
@@ -514,59 +553,74 @@ function LogoutPage({
   const redirectUrl = global ? globalLogout() : localLogout()
 
   return (
-    <CardShell
-      route={global ? '/logout/global' : '/logout'}
-      title={global ? 'Global logout' : 'Local logout'}
+    <ShellCard
+      route={global ? "/logout/global" : "/logout"}
+      title={global ? "Sign out everywhere" : "Sign out"}
       subtitle={
         global
-          ? 'Clear the central SSO session and revoke refresh-token chains.'
-          : 'Clear only the current client session.'
+          ? "End your central session and require a fresh sign-in across connected apps."
+          : "End your session for this app."
       }
       requestId={requestId}
-      message={null}
     >
-      <ActionButton
-        label={global ? 'Sign out everywhere' : 'Sign out from this app'}
-        busy={busy}
-        onClick={async () => {
-          setMessage(null)
-          setBusy(true)
-          const result = redirectUrl
-          setBusy(false)
-          handleActionResult(result, setMessage)
-        }}
-      />
-    </CardShell>
+      <div className="space-y-5">
+        <p className="text-sm leading-6 text-muted-foreground">
+          Choose whether to sign out from just this app or from every connected session.
+        </p>
+        <Button
+          size="lg"
+          className="w-full sm:w-auto"
+          variant={global ? "destructive" : "default"}
+          onClick={async () => {
+            setMessage(null)
+            setBusy(true)
+            const result = redirectUrl
+            setBusy(false)
+            handleActionResult(result, setMessage)
+          }}
+        >
+          <LogOut className="size-4" />
+          {busy
+            ? "Working..."
+            : global
+              ? "Sign out everywhere"
+              : "Sign out from this app"}
+        </Button>
+      </div>
+    </ShellCard>
   )
 }
 
 function TransitionPage({ flow, requestId }: PageProps) {
   const stage = flow?.stage
   const title =
-    stage === 'provider_redirect'
-      ? 'Redirecting to provider'
-      : stage === 'authorization_ready'
-        ? 'Completing authorization'
-        : 'Authorization complete'
+    stage === "provider_redirect"
+      ? "Redirecting to provider"
+      : stage === "authorization_ready"
+        ? "Completing authorization"
+        : "Authorization complete"
   const subtitle =
-    stage === 'provider_redirect'
-      ? 'auth-server is sending the browser to the external login provider.'
-      : stage === 'authorization_ready'
-        ? 'Consent is complete. auth-server should issue the authorization code next.'
-        : 'auth-server should redirect the browser back to the client now.'
+    stage === "provider_redirect"
+      ? "auth-server is sending the browser to the external login provider."
+      : stage === "authorization_ready"
+        ? "Consent is complete. auth-server should issue the authorization code next."
+        : "auth-server should redirect the browser back to the client now."
 
   return (
-    <CardShell
+    <ShellCard
       route="/login"
       title={title}
       subtitle={subtitle}
       requestId={requestId}
       flow={flow}
     >
-      <p className="hint">
-        This is a transitional state. The browser should not stay here for long.
-      </p>
-    </CardShell>
+      <div className="flex items-center gap-3 rounded-3xl border border-border/70 bg-secondary/30 p-5">
+        <div className="size-3 animate-pulse rounded-full bg-primary" />
+        <p className="text-sm text-muted-foreground">
+          This is a transitional step. The browser should not remain here for long.
+        </p>
+      </div>
+    </ShellCard>
   )
 }
 
@@ -578,23 +632,22 @@ function ErrorPage({
   detail: string | null
 }) {
   return (
-    <CardShell
+    <ShellCard
       route="/error"
-      title="Auth error"
-      subtitle="Render a safe terminal error state for the current flow."
+      title="We couldn't complete sign-in"
+      subtitle="Something interrupted the flow before it could finish."
       requestId={requestId}
       flow={flow}
       message={detail}
     >
-      <p className="hint">
-        If this request is still valid, auth-server should return the client to its redirect
-        URI with RFC-style OAuth error details.
-      </p>
-    </CardShell>
+      <EmptyHint>
+        Try returning to the application and starting sign-in again.
+      </EmptyHint>
+    </ShellCard>
   )
 }
 
-function CardShell({
+function ShellCard({
   route,
   title,
   subtitle,
@@ -612,103 +665,198 @@ function CardShell({
   children?: ReactNode
 }) {
   return (
-    <article className="card">
-      <div className="card-topline">
-        <span className="route-badge">{route}</span>
-        <span className="request-pill">{requestId || 'no request_id'}</span>
-      </div>
-
-      <header className="card-header">
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
-      </header>
-
-      {flow && <FlowSnapshot flow={flow} />}
-      {message && <MessageBanner message={message} />}
-
-      <div className="card-body">{children}</div>
-    </article>
+    <Card className="border-slate-200/80 bg-white/88">
+      <CardHeader className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Badge variant="outline">{route}</Badge>
+          {requestId && <Badge variant="secondary">Session active</Badge>}
+        </div>
+        <div className="space-y-2">
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{subtitle}</CardDescription>
+        </div>
+        {flow && <FlowSnapshot flow={flow} />}
+        {message && (
+          <Alert>
+            <AlertDescription>{message}</AlertDescription>
+          </Alert>
+        )}
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   )
 }
 
 function FlowSnapshot({ flow }: { flow: FlowContext }) {
   return (
-    <section className="snapshot" aria-label="Flow context">
-      <div>
-        <span>Client</span>
-        <strong>{flow.client.display_name}</strong>
-      </div>
-      <div>
-        <span>Stage</span>
-        <strong>{flow.stage}</strong>
-      </div>
-      <div>
-        <span>Scopes</span>
-        <strong>{flow.requested_scopes.join(' ') || 'none'}</strong>
-      </div>
-      <div>
-        <span>Expires</span>
-        <strong>{new Date(flow.expires_at).toLocaleString()}</strong>
-      </div>
-      <div>
-        <span>Account hint</span>
-        <strong>{flow.account_hint?.email ?? flow.account_hint?.display_name ?? 'none'}</strong>
-      </div>
-    </section>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <SnapshotItem label="Client" value={flow.client.display_name} />
+      <SnapshotItem label="Step" value={humanStage(flow.stage)} />
+      <SnapshotItem label="Scopes" value={flow.requested_scopes.join(" ") || "none"} />
+      <SnapshotItem
+        label="Account hint"
+        value={flow.account_hint?.email ?? flow.account_hint?.display_name ?? "none"}
+      />
+    </div>
   )
 }
 
 function ScopeList({ scopes }: { scopes: string[] }) {
   if (scopes.length === 0) {
-    return <p className="hint">No scopes were requested on this flow.</p>
+    return <EmptyHint>No scopes were requested on this flow.</EmptyHint>
+  }
+
+  const descriptions: Record<string, string> = {
+    openid: "Finish secure sign-in.",
+    email: "View your verified email address.",
+    profile: "View your basic profile details.",
+    "trading.read": "Read trading information associated with your account.",
+    "trading.write": "Create and manage trading actions on your behalf.",
   }
 
   return (
-    <ul className="scope-list">
+    <div className="grid gap-3">
       {scopes.map((scope) => (
-        <li key={scope}>{scope}</li>
+        <div
+          key={scope}
+          className="rounded-2xl border border-border/70 bg-white/80 px-4 py-3 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="size-4 text-primary" />
+            <div className="space-y-1">
+              <div className="text-sm font-medium text-slate-900">{scope}</div>
+              <div className="text-sm text-muted-foreground">
+                {descriptions[scope] ?? "Access requested by this application."}
+              </div>
+            </div>
+          </div>
+        </div>
       ))}
-    </ul>
+    </div>
   )
 }
 
-function ActionGroup({ children }: { children: ReactNode }) {
-  return <div className="actions">{children}</div>
+function SnapshotItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-secondary/30 px-4 py-3">
+      <div className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-2 break-words text-sm font-medium text-slate-900">{value}</div>
+    </div>
+  )
 }
 
-function ActionRow({ children }: { children: ReactNode }) {
-  return <div className="action-row">{children}</div>
-}
-
-function ActionButton({
-  label,
-  busy = false,
-  secondary = false,
-  disabled = false,
-  type = 'button',
-  onClick,
+function PromiseCard({
+  icon,
+  title,
+  text,
 }: {
-  label: string
-  busy?: boolean
-  secondary?: boolean
-  disabled?: boolean
-  type?: 'button' | 'submit'
-  onClick?: () => void | Promise<void>
+  icon: ReactNode
+  title: string
+  text: string
 }) {
   return (
-    <button
-      className={secondary ? 'button button-secondary' : 'button'}
-      type={type}
-      onClick={onClick}
-      disabled={busy || disabled}
-    >
-      {busy ? 'Working...' : label}
-    </button>
+    <div className="rounded-3xl border border-white/70 bg-white/72 p-5 shadow-sm backdrop-blur">
+      <div className="mb-3 inline-flex rounded-2xl bg-white/80 p-2 text-primary shadow-sm">
+        {icon}
+      </div>
+      <div className="space-y-1.5">
+        <div className="text-sm font-medium text-slate-900">{title}</div>
+        <div className="text-sm leading-6 text-slate-600">{text}</div>
+      </div>
+    </div>
   )
 }
 
-function MessageBanner({ message }: { message: string }) {
-  return <div className="message-banner">{message}</div>
+function Pill({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-4 py-2 text-sm text-slate-700 shadow-sm">
+      <span className="text-primary">{icon}</span>
+      <span>{label}</span>
+    </div>
+  )
+}
+
+function LabeledField({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-medium text-slate-900">{title}</span>
+      {children}
+    </label>
+  )
+}
+
+function FieldLabel({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="text-sm font-medium text-slate-900">{title}</div>
+      <div className="text-sm leading-6 text-muted-foreground">{description}</div>
+    </div>
+  )
+}
+
+function EmptyHint({ children }: { children: ReactNode }) {
+  return <p className="text-sm leading-6 text-muted-foreground">{children}</p>
+}
+
+function FooterBand() {
+  return (
+    <Card className="border-white/70 bg-white/75">
+      <CardContent className="flex flex-col gap-4 p-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <div className="font-medium text-slate-900">Hosted by {appConfig.appName}</div>
+          <div>Secure sign-in, approval, and verification in one place.</div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">Google</Badge>
+          <Badge variant="outline">GitHub</Badge>
+          <Badge variant="outline">Email OTP</Badge>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function DevPanel({ requestId }: { requestId: string }) {
+  const searchParams = new URLSearchParams(window.location.search)
+  if (!import.meta.env.DEV || searchParams.get("debug") !== "1") {
+    return null
+  }
+
+  return (
+    <details className="group rounded-3xl border border-border/70 bg-white/60 p-5 text-sm text-muted-foreground">
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-slate-700">
+        <Bug className="size-4" />
+        Developer details
+      </summary>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <SnapshotItem label="Auth Server" value={appConfig.authServerUrl} />
+        <SnapshotItem label="Auth UI" value={appConfig.authUiUrl} />
+        <SnapshotItem label="Request" value={requestId || "none"} />
+      </div>
+    </details>
+  )
+}
+
+function GoogleGlyph() {
+  return (
+    <span className="inline-grid size-5 place-items-center rounded-full bg-white text-[10px] font-semibold text-slate-900">
+      G
+    </span>
+  )
 }
 
 function handleActionResult(
@@ -725,7 +873,7 @@ function handleActionResult(
       return
     }
 
-    setMessage('Action completed. Awaiting auth-server redirect.')
+    setMessage("Working...")
     return
   }
 
@@ -733,3 +881,24 @@ function handleActionResult(
 }
 
 export default App
+
+function humanStage(stage: FlowStage): string {
+  switch (stage) {
+    case "login_required":
+      return "Sign in"
+    case "provider_redirect":
+      return "Provider redirect"
+    case "otp_required":
+      return "Email verification"
+    case "consent_required":
+      return "Approval"
+    case "authorization_ready":
+      return "Completing"
+    case "completed":
+      return "Finished"
+    case "failed":
+      return "Error"
+    case "expired":
+      return "Expired"
+  }
+}
