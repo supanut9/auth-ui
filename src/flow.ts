@@ -45,6 +45,7 @@ export type FlowActionResult =
   | {
       ok: true
       redirectTo?: string
+      authorizationUrl?: string
     }
   | {
       ok: false
@@ -98,12 +99,13 @@ async function callAction(
 
     if (response.ok) {
       const data = (await response.json().catch(() => null)) as
-        | { redirect_to?: string; redirectTo?: string }
+        | { redirect_to?: string; redirectTo?: string; authorization_url?: string; authorizationUrl?: string }
         | null
 
       return {
         ok: true,
         redirectTo: data?.redirect_to ?? data?.redirectTo,
+        authorizationUrl: data?.authorization_url ?? data?.authorizationUrl,
       }
     }
 

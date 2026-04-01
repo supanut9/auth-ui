@@ -692,6 +692,10 @@ function handleActionResult(
   setMessage: (message: string | null) => void,
 ) {
   if (result.ok) {
+    if (result.authorizationUrl) {
+      window.location.assign(result.authorizationUrl)
+      return
+    }
     if (result.redirectTo) {
       window.location.assign(result.redirectTo)
       return
