@@ -42,7 +42,9 @@ type StageView = 'login' | 'consent' | 'otp' | 'transition' | 'error'
 
 function App() {
   const route = getUiRoute(window.location.pathname)
-  const requestId = new URLSearchParams(window.location.search).get('request_id') ?? ''
+  const searchParams = new URLSearchParams(window.location.search)
+  const requestId = searchParams.get('request_id') ?? ''
+  const emailParam = searchParams.get('email') ?? ''
 
   return (
     <main className="app-shell">
@@ -67,7 +69,7 @@ function App() {
       </section>
 
       <section className="page-panel">
-        <AuthPage route={route} requestId={requestId} />
+        <AuthPage route={route} requestId={requestId} emailParam={emailParam} />
       </section>
     </main>
   )
@@ -76,9 +78,10 @@ function App() {
 type AuthPageProps = {
   route: UiRoute
   requestId: string
+  emailParam: string
 }
 
-function AuthPage({ route, requestId }: AuthPageProps) {
+function AuthPage({ route, requestId, emailParam }: AuthPageProps) {
   const [panelState, setPanelState] = useState<FlowPanelState>(() =>
     requestId ? { status: 'loading', flow: null, error: null } : { status: 'ready', flow: null, error: null },
   )
@@ -174,6 +177,7 @@ function AuthPage({ route, requestId }: AuthPageProps) {
           key={flow?.request_id || requestId || 'otp'}
           flow={flow}
           requestId={requestId}
+          emailParam={emailParam}
           message={message}
           setMessage={setMessage}
         />
@@ -310,6 +314,13 @@ function LoginPage({ flow, requestId, message, setMessage }: PageProps & FlowMes
             setBusy('otp')
             const result = await startOtp(requestId, email.trim())
             setBusy(null)
+            if (result.ok && !result.authorizationUrl && !result.redirectTo) {
+              setMessage('Verification code sent. Enter the code on the OTP page.')
+              window.location.assign(
+                `${appConfig.authUiUrl}/otp?request_id=${encodeURIComponent(requestId)}&email=${encodeURIComponent(email.trim())}`,
+              )
+              return
+            }
             handleActionResult(result, setMessage)
           }}
         >
@@ -391,8 +402,17 @@ function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowM
   )
 }
 
-function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
-  const [email, setEmail] = useState(flow?.otp.masked_email ?? '')
+function OtpPage({
+  flow,
+  requestId,
+  emailParam,
+  message,
+  setMessage,
+}: PageProps &
+  FlowMessageProps & {
+    emailParam: string
+  }) {
+  const [email, setEmail] = useState(emailParam || '')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState<'verify' | 'resend' | null>(null)
   const canAct = Boolean(requestId)
@@ -464,6 +484,10 @@ function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessa
               setBusy('resend')
               const result = await resendOtp(requestId, email.trim())
               setBusy(null)
+              if (result.ok && !result.authorizationUrl && !result.redirectTo) {
+                setMessage('Verification code resent.')
+                return
+              }
               handleActionResult(result, setMessage)
             }}
           />
