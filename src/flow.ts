@@ -51,6 +51,16 @@ export type FlowActionResult =
       message: string
     }
 
+export type FlowLoadResult =
+  | {
+      ok: true
+      flow: FlowContext | null
+    }
+  | {
+      ok: false
+      message: string
+    }
+
 async function callJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${appConfig.authServerUrl}${path}`, {
     credentials: 'include',
@@ -117,15 +127,18 @@ async function callAction(
 
 export async function loadFlowContext(
   requestId: string,
-): Promise<FlowContext | null> {
+): Promise<FlowLoadResult> {
   if (!requestId) {
-    return null
+    return { ok: true, flow: null }
   }
 
   try {
-    return await callJson<FlowContext>(`/v1/auth/requests/${requestId}`)
-  } catch {
-    return null
+    return { ok: true, flow: await callJson<FlowContext>(`/v1/auth/requests/${requestId}`) }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Unable to load flow context',
+    }
   }
 }
 
@@ -161,10 +174,16 @@ export function rejectConsent(requestId: string): Promise<FlowActionResult> {
   return callAction('/v1/auth/consent/reject', { request_id: requestId })
 }
 
-export function localLogout(): Promise<FlowActionResult> {
-  return callAction('/v1/auth/logout', {})
+export function localLogout(): FlowActionResult {
+  return {
+    ok: true,
+    redirectTo: `${appConfig.authServerUrl}/v1/auth/logout`,
+  }
 }
 
-export function globalLogout(): Promise<FlowActionResult> {
-  return callAction('/v1/auth/logout/global', {})
+export function globalLogout(): FlowActionResult {
+  return {
+    ok: true,
+    redirectTo: `${appConfig.authServerUrl}/v1/auth/logout/global`,
+  }
 }

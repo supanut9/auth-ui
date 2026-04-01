@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import './App.css'
 import { appConfig } from './config'
+import type {
+  FlowActionResult,
+  FlowContext,
+  FlowStage,
+} from './flow'
 import {
   acceptConsent,
   globalLogout,
-  localLogout,
   loadFlowContext,
+  localLogout,
   rejectConsent,
   resendOtp,
   startGitHubLogin,
@@ -13,9 +19,26 @@ import {
   startOtp,
   verifyOtp,
 } from './flow'
-import type { FlowActionResult, FlowContext } from './flow'
 import { getUiRoute, type UiRoute } from './routes'
-import type { ReactNode } from 'react'
+
+type FlowPanelState =
+  | {
+      status: 'loading'
+      flow: null
+      error: null
+    }
+  | {
+      status: 'ready'
+      flow: FlowContext | null
+      error: null
+    }
+  | {
+      status: 'error'
+      flow: null
+      error: string
+    }
+
+type StageView = 'login' | 'consent' | 'otp' | 'transition' | 'error'
 
 function App() {
   const route = getUiRoute(window.location.pathname)
@@ -36,6 +59,8 @@ function App() {
         <div className="hero-meta">
           <span>Auth server</span>
           <strong>{appConfig.authServerUrl}</strong>
+          <span>Auth UI</span>
+          <strong>{appConfig.authUiUrl}</strong>
           <span>Request</span>
           <strong>{requestId || 'none'}</strong>
         </div>
@@ -54,8 +79,9 @@ type AuthPageProps = {
 }
 
 function AuthPage({ route, requestId }: AuthPageProps) {
-  const [flow, setFlow] = useState<FlowContext | null>(null)
-  const [loading, setLoading] = useState(Boolean(requestId))
+  const [panelState, setPanelState] = useState<FlowPanelState>(() =>
+    requestId ? { status: 'loading', flow: null, error: null } : { status: 'ready', flow: null, error: null },
+  )
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,18 +89,22 @@ function AuthPage({ route, requestId }: AuthPageProps) {
 
     async function run() {
       if (!requestId) {
-        setFlow(null)
-        setLoading(false)
+        setPanelState({ status: 'ready', flow: null, error: null })
         return
       }
 
-      setLoading(true)
-      const context = await loadFlowContext(requestId)
+      setPanelState({ status: 'loading', flow: null, error: null })
+      const result = await loadFlowContext(requestId)
       if (!active) {
         return
       }
-      setFlow(context)
-      setLoading(false)
+
+      if (result.ok) {
+        setPanelState({ status: 'ready', flow: result.flow, error: null })
+        return
+      }
+
+      setPanelState({ status: 'error', flow: null, error: result.message })
     }
 
     void run()
@@ -84,52 +114,113 @@ function AuthPage({ route, requestId }: AuthPageProps) {
     }
   }, [requestId])
 
-  if (loading) {
+  if (panelState.status === 'loading') {
     return (
       <CardShell
         route={route}
         title="Loading"
-        subtitle="Fetching flow context..."
+        subtitle="Fetching flow context from auth-server."
         requestId={requestId}
+      >
+        <p className="hint">This page is waiting for the pending authorization request.</p>
+      </CardShell>
+    )
+  }
+
+  if (panelState.status === 'error') {
+    return (
+      <ErrorPage
+        flow={null}
+        requestId={requestId}
+        detail={panelState.error}
       />
     )
   }
 
-  switch (route) {
-    case '/consent':
+  const flow = panelState.flow
+
+  if (route === '/logout') {
+    return <LogoutPage requestId={requestId} global={false} setMessage={setMessage} />
+  }
+
+  if (route === '/logout/global') {
+    return <LogoutPage requestId={requestId} global setMessage={setMessage} />
+  }
+
+  if (route === '/error') {
+    return (
+      <ErrorPage
+        flow={flow}
+        requestId={requestId}
+        detail={message}
+      />
+    )
+  }
+
+  switch (getStageView(flow?.stage, route)) {
+    case 'consent':
       return (
         <ConsentPage
+          key={flow?.request_id || requestId || 'consent'}
           flow={flow}
           requestId={requestId}
           message={message}
           setMessage={setMessage}
         />
       )
-    case '/otp':
+    case 'otp':
       return (
         <OtpPage
+          key={flow?.request_id || requestId || 'otp'}
           flow={flow}
           requestId={requestId}
           message={message}
           setMessage={setMessage}
         />
       )
-    case '/logout':
-      return <LogoutPage requestId={requestId} global={false} setMessage={setMessage} />
-    case '/logout/global':
-      return <LogoutPage requestId={requestId} global setMessage={setMessage} />
-    case '/error':
-      return <ErrorPage flow={flow} requestId={requestId} />
-    case '/login':
+    case 'transition':
+      return <TransitionPage flow={flow} requestId={requestId} />
+    case 'error':
+      return (
+        <ErrorPage
+          flow={flow}
+          requestId={requestId}
+          detail={message}
+        />
+      )
+    case 'login':
     default:
       return (
         <LoginPage
+          key={flow?.request_id || requestId || 'login'}
           flow={flow}
           requestId={requestId}
           message={message}
           setMessage={setMessage}
         />
       )
+  }
+}
+
+function getStageView(stage: FlowStage | undefined, route: UiRoute): StageView {
+  if (!stage) {
+    return route === '/consent' ? 'consent' : route === '/otp' ? 'otp' : 'login'
+  }
+
+  switch (stage) {
+    case 'login_required':
+      return 'login'
+    case 'provider_redirect':
+    case 'authorization_ready':
+    case 'completed':
+      return 'transition'
+    case 'otp_required':
+      return 'otp'
+    case 'consent_required':
+      return 'consent'
+    case 'failed':
+    case 'expired':
+      return 'error'
   }
 }
 
@@ -143,20 +234,12 @@ type FlowMessageProps = {
   setMessage: (message: string | null) => void
 }
 
-function LoginPage({
-  flow,
-  requestId,
-  message,
-  setMessage,
-}: PageProps & FlowMessageProps) {
+function LoginPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
   const [email, setEmail] = useState(flow?.otp.masked_email ?? '')
   const [busy, setBusy] = useState<'google' | 'github' | 'otp' | null>(null)
 
-  useEffect(() => {
-    setEmail(flow?.otp.masked_email ?? '')
-  }, [flow?.otp.masked_email])
-
   const loginMethods = flow?.available_login_methods ?? ['google', 'github', 'email_otp']
+  const canAct = Boolean(requestId)
 
   return (
     <CardShell
@@ -167,12 +250,24 @@ function LoginPage({
       flow={flow}
       message={message}
     >
+      {!canAct && (
+        <p className="hint">
+          A `request_id` is required. Start the flow from auth-server so this page can load
+          the pending authorization context.
+        </p>
+      )}
+
       <ActionGroup>
         {loginMethods.includes('google') && (
           <ActionButton
             label="Continue with Google"
             busy={busy === 'google'}
+            disabled={!canAct}
             onClick={async () => {
+              if (!canAct) {
+                setMessage('Missing request_id.')
+                return
+              }
               setMessage(null)
               setBusy('google')
               const result = await startGoogleLogin(requestId)
@@ -186,7 +281,12 @@ function LoginPage({
           <ActionButton
             label="Continue with GitHub"
             busy={busy === 'github'}
+            disabled={!canAct}
             onClick={async () => {
+              if (!canAct) {
+                setMessage('Missing request_id.')
+                return
+              }
               setMessage(null)
               setBusy('github')
               const result = await startGitHubLogin(requestId)
@@ -202,6 +302,10 @@ function LoginPage({
           className="inline-form"
           onSubmit={async (event) => {
             event.preventDefault()
+            if (!canAct) {
+              setMessage('Missing request_id.')
+              return
+            }
             setMessage(null)
             setBusy('otp')
             const result = await startOtp(requestId, email.trim())
@@ -216,22 +320,19 @@ function LoginPage({
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
+              disabled={!canAct}
             />
           </label>
-          <ActionButton label="Send OTP" busy={busy === 'otp'} type="submit" />
+          <ActionButton label="Send OTP" busy={busy === 'otp'} disabled={!canAct} type="submit" />
         </form>
       )}
     </CardShell>
   )
 }
 
-function ConsentPage({
-  flow,
-  requestId,
-  message,
-  setMessage,
-}: PageProps & FlowMessageProps) {
+function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
   const [busy, setBusy] = useState<'accept' | 'reject' | null>(null)
+  const canAct = Boolean(requestId)
 
   return (
     <CardShell
@@ -242,13 +343,25 @@ function ConsentPage({
       flow={flow}
       message={message}
     >
+      {!canAct && (
+        <p className="hint">
+          A `request_id` is required. Open the consent page from the pending authorization
+          flow.
+        </p>
+      )}
+
       <ScopeList scopes={flow?.requested_scopes ?? []} />
 
       <ActionRow>
         <ActionButton
           label="Approve"
           busy={busy === 'accept'}
+          disabled={!canAct}
           onClick={async () => {
+            if (!canAct) {
+              setMessage('Missing request_id.')
+              return
+            }
             setMessage(null)
             setBusy('accept')
             const result = await acceptConsent(requestId)
@@ -260,7 +373,12 @@ function ConsentPage({
           label="Reject"
           secondary
           busy={busy === 'reject'}
+          disabled={!canAct}
           onClick={async () => {
+            if (!canAct) {
+              setMessage('Missing request_id.')
+              return
+            }
             setMessage(null)
             setBusy('reject')
             const result = await rejectConsent(requestId)
@@ -276,11 +394,8 @@ function ConsentPage({
 function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessageProps) {
   const [email, setEmail] = useState(flow?.otp.masked_email ?? '')
   const [code, setCode] = useState('')
-  const [busy, setBusy] = useState<'send' | 'verify' | 'resend' | null>(null)
-
-  useEffect(() => {
-    setEmail(flow?.otp.masked_email ?? '')
-  }, [flow?.otp.masked_email])
+  const [busy, setBusy] = useState<'verify' | 'resend' | null>(null)
+  const canAct = Boolean(requestId)
 
   return (
     <CardShell
@@ -291,10 +406,20 @@ function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessa
       flow={flow}
       message={message}
     >
+      {!canAct && (
+        <p className="hint">
+          A `request_id` is required. Open the OTP page from the pending authorization flow.
+        </p>
+      )}
+
       <form
         className="inline-form"
         onSubmit={async (event) => {
           event.preventDefault()
+          if (!canAct) {
+            setMessage('Missing request_id.')
+            return
+          }
           setMessage(null)
           setBusy('verify')
           const result = await verifyOtp(requestId, email.trim(), code.trim())
@@ -309,6 +434,7 @@ function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessa
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="name@example.com"
+            disabled={!canAct}
           />
         </label>
         <label>
@@ -319,15 +445,21 @@ function OtpPage({ flow, requestId, message, setMessage }: PageProps & FlowMessa
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="123456"
+            disabled={!canAct}
           />
         </label>
         <ActionRow>
-          <ActionButton label="Verify" busy={busy === 'verify'} type="submit" />
+          <ActionButton label="Verify" busy={busy === 'verify'} disabled={!canAct} type="submit" />
           <ActionButton
-            label="Resend"
-            secondary
-            busy={busy === 'resend'}
-            onClick={async () => {
+          label="Resend"
+          secondary
+          busy={busy === 'resend'}
+          disabled={!canAct}
+          onClick={async () => {
+              if (!canAct) {
+                setMessage('Missing request_id.')
+                return
+              }
               setMessage(null)
               setBusy('resend')
               const result = await resendOtp(requestId, email.trim())
@@ -355,6 +487,7 @@ function LogoutPage({
   setMessage: (message: string | null) => void
 }) {
   const [busy, setBusy] = useState(false)
+  const redirectUrl = global ? globalLogout() : localLogout()
 
   return (
     <CardShell
@@ -374,7 +507,7 @@ function LogoutPage({
         onClick={async () => {
           setMessage(null)
           setBusy(true)
-          const result = global ? await globalLogout() : await localLogout()
+          const result = redirectUrl
           setBusy(false)
           handleActionResult(result, setMessage)
         }}
@@ -383,7 +516,43 @@ function LogoutPage({
   )
 }
 
-function ErrorPage({ flow, requestId }: PageProps) {
+function TransitionPage({ flow, requestId }: PageProps) {
+  const stage = flow?.stage
+  const title =
+    stage === 'provider_redirect'
+      ? 'Redirecting to provider'
+      : stage === 'authorization_ready'
+        ? 'Completing authorization'
+        : 'Authorization complete'
+  const subtitle =
+    stage === 'provider_redirect'
+      ? 'auth-server is sending the browser to the external login provider.'
+      : stage === 'authorization_ready'
+        ? 'Consent is complete. auth-server should issue the authorization code next.'
+        : 'auth-server should redirect the browser back to the client now.'
+
+  return (
+    <CardShell
+      route="/login"
+      title={title}
+      subtitle={subtitle}
+      requestId={requestId}
+      flow={flow}
+    >
+      <p className="hint">
+        This is a transitional state. The browser should not stay here for long.
+      </p>
+    </CardShell>
+  )
+}
+
+function ErrorPage({
+  flow,
+  requestId,
+  detail,
+}: PageProps & {
+  detail: string | null
+}) {
   return (
     <CardShell
       route="/error"
@@ -391,11 +560,11 @@ function ErrorPage({ flow, requestId }: PageProps) {
       subtitle="Render a safe terminal error state for the current flow."
       requestId={requestId}
       flow={flow}
-      message={null}
+      message={detail}
     >
       <p className="hint">
-        If this request is still valid, auth-server should return the client to its
-        redirect URI with RFC-style OAuth error details.
+        If this request is still valid, auth-server should return the client to its redirect
+        URI with RFC-style OAuth error details.
       </p>
     </CardShell>
   )
@@ -457,6 +626,10 @@ function FlowSnapshot({ flow }: { flow: FlowContext }) {
         <span>Expires</span>
         <strong>{new Date(flow.expires_at).toLocaleString()}</strong>
       </div>
+      <div>
+        <span>Account hint</span>
+        <strong>{flow.account_hint?.email ?? flow.account_hint?.display_name ?? 'none'}</strong>
+      </div>
     </section>
   )
 }
@@ -487,12 +660,14 @@ function ActionButton({
   label,
   busy = false,
   secondary = false,
+  disabled = false,
   type = 'button',
   onClick,
 }: {
   label: string
   busy?: boolean
   secondary?: boolean
+  disabled?: boolean
   type?: 'button' | 'submit'
   onClick?: () => void | Promise<void>
 }) {
@@ -501,7 +676,7 @@ function ActionButton({
       className={secondary ? 'button button-secondary' : 'button'}
       type={type}
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || disabled}
     >
       {busy ? 'Working...' : label}
     </button>
