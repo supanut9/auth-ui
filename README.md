@@ -13,6 +13,13 @@ Phase-1 hosted login and consent UI for the platform.
 - auth-ui: `http://localhost:3005`
 - auth-server: `http://localhost:8050`
 
+## Production Baseline
+
+- `bun run check` runs linting, typecheck, and production build
+- `bun run preview` serves the built app on `http://localhost:3005`
+- invalid browser redirect URLs fail fast during app config initialization
+- keep `VITE_AUTH_SERVER_URL`, `VITE_AUTH_UI_URL`, and `VITE_APP_NAME` set for deploys
+
 ## Responsibilities
 
 - render login page

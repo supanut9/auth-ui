@@ -18,3 +18,10 @@ Rules:
 - no provider secrets in the UI
 - no token signing config in the UI
 - keep the UI configuration focused on rendering and API integration only
+- validate browser-facing base URLs at startup
+- fail fast if `VITE_APP_NAME` is empty
+
+Deployment baseline:
+
+- `bun run check` should pass before release
+- `bun run preview` should be used to smoke-test the built static bundle
