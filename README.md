@@ -17,6 +17,7 @@ Phase-1 hosted login and consent UI for the platform.
 
 - `bun run check` runs linting, typecheck, and production build
 - `bun run preview` serves the built app on `http://localhost:3005`
+- `bun run smoke` verifies the built preview serves the key SPA routes
 - invalid browser redirect URLs fail fast during app config initialization
 - keep `VITE_AUTH_SERVER_URL`, `VITE_AUTH_UI_URL`, and `VITE_APP_NAME` set for deploys
 

@@ -25,3 +25,4 @@ Deployment baseline:
 
 - `bun run check` should pass before release
 - `bun run preview` should be used to smoke-test the built static bundle
+- `bun run smoke` should be used for route-level deploy verification
