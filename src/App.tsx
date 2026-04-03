@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import {
+  ArrowLeft,
   ArrowRight,
   Bug,
   CheckCircle2,
@@ -10,8 +11,10 @@ import {
   LockKeyhole,
   LogOut,
   Mail,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
+  UserRound,
 } from "lucide-react"
 
 import { appConfig } from "./config"
@@ -264,7 +267,7 @@ function LoginPage({ flow, requestId, message, setMessage }: PageProps & FlowMes
     <ShellCard
       route="/login"
       title={flow ? `Continue to ${flow.client.display_name}` : "Sign in"}
-      subtitle="Choose the account you want to use."
+      subtitle="Choose the account that should carry this session."
       requestId={requestId}
       flow={flow}
       message={message}
@@ -274,6 +277,8 @@ function LoginPage({ flow, requestId, message, setMessage }: PageProps & FlowMes
           Start from the application you were signing in to so this page can load properly.
         </EmptyHint>
       )}
+
+      <AccountSummary flow={flow} />
 
       <div className="grid gap-3">
         {loginMethods.includes("google") && (
@@ -381,7 +386,7 @@ function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowM
     <ShellCard
       route="/consent"
       title={flow ? `${flow.client.display_name} needs your approval` : "Review access"}
-      subtitle="Check what this app is asking to access before continuing."
+      subtitle="Review the scopes, account hint, and session choice before you allow access."
       requestId={requestId}
       flow={flow}
       message={message}
@@ -396,10 +401,12 @@ function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowM
         <div className="rounded-3xl border border-border/70 bg-secondary/35 p-5">
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck className="size-4 text-primary" />
-            <span className="text-sm font-medium text-slate-800">What this app can access</span>
+            <span className="text-sm font-medium text-slate-800">Requested access</span>
           </div>
           <ScopeList scopes={flow?.requested_scopes ?? []} />
         </div>
+
+        <AccountSummary flow={flow} />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Button
@@ -429,9 +436,12 @@ function ConsentPage({ flow, requestId, message, setMessage }: PageProps & FlowM
               handleActionResult(result, setMessage)
             }}
           >
-            {busy === "reject" ? "Rejecting..." : "Cancel"}
+            {busy === "reject" ? "Rejecting..." : "Deny access"}
           </Button>
         </div>
+        <p className="text-xs leading-6 text-muted-foreground">
+          Allow only if you trust this application and understand the requested access.
+        </p>
       </div>
     </ShellCard>
   )
@@ -456,7 +466,7 @@ function OtpPage({
     <ShellCard
       route="/otp"
       title="Check your email"
-      subtitle="Enter the one-time code we sent to continue."
+      subtitle="Enter the one-time code tied to this sign-in session."
       requestId={requestId}
       flow={flow}
       message={message}
@@ -474,6 +484,8 @@ function OtpPage({
           </div>
         </div>
       </div>
+
+      <AccountSummary flow={flow} />
 
       <form
         className="space-y-4"
@@ -559,13 +571,13 @@ function LogoutPage({
       subtitle={
         global
           ? "End your central session and require a fresh sign-in across connected apps."
-          : "End your session for this app."
+          : "End the session only for this browser and this app."
       }
       requestId={requestId}
     >
       <div className="space-y-5">
         <p className="text-sm leading-6 text-muted-foreground">
-          Choose whether to sign out from just this app or from every connected session.
+          Choose whether to sign out from just this app or from every connected session. The local option clears only this app's browser session; the global option ends the central sign-in session too.
         </p>
         <Button
           size="lg"
@@ -586,6 +598,15 @@ function LogoutPage({
               ? "Sign out everywhere"
               : "Sign out from this app"}
         </Button>
+        <div className="rounded-3xl border border-border/70 bg-secondary/25 p-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 font-medium text-slate-900">
+            <UserRound className="size-4 text-primary" />
+            Session behavior
+          </div>
+          <p className="mt-2 leading-6">
+            Local sign-out keeps the platform session intact for other connected apps. Global sign-out removes the central session and any linked browser trust.
+          </p>
+        </div>
       </div>
     </ShellCard>
   )
@@ -631,18 +652,60 @@ function ErrorPage({
 }: PageProps & {
   detail: string | null
 }) {
+  const isExpired = flow?.stage === "expired"
+  const isFailed = flow?.stage === "failed"
+
   return (
     <ShellCard
       route="/error"
-      title="We couldn't complete sign-in"
-      subtitle="Something interrupted the flow before it could finish."
+      title={
+        isExpired
+          ? "This sign-in request expired"
+          : isFailed
+            ? "This sign-in request was rejected"
+            : "We couldn't complete sign-in"
+      }
+      subtitle={
+        isExpired
+          ? "Start a fresh sign-in from the application."
+          : isFailed
+            ? "The flow was stopped before completion."
+            : "Something interrupted the flow before it could finish."
+      }
       requestId={requestId}
       flow={flow}
       message={detail}
     >
-      <EmptyHint>
-        Try returning to the application and starting sign-in again.
-      </EmptyHint>
+      <div className="space-y-4">
+        <EmptyHint>
+          {isExpired
+            ? "The request timed out or was completed elsewhere. Go back to the application and start sign-in again."
+            : isFailed
+              ? "Approval was denied or the request was invalid. Start a new sign-in from the application."
+              : "Try returning to the application and starting sign-in again."}
+        </EmptyHint>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              window.history.back()
+            }}
+          >
+            <ArrowLeft className="size-4" />
+            Go back
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              window.location.reload()
+            }}
+          >
+            <RotateCcw className="size-4" />
+            Retry current page
+          </Button>
+        </div>
+      </div>
     </ShellCard>
   )
 }
@@ -669,7 +732,7 @@ function ShellCard({
       <CardHeader className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Badge variant="outline">{route}</Badge>
-          {requestId && <Badge variant="secondary">Session active</Badge>}
+          {requestId && <Badge variant="secondary">Request active</Badge>}
         </div>
         <div className="space-y-2">
           <CardTitle>{title}</CardTitle>
@@ -687,6 +750,32 @@ function ShellCard({
   )
 }
 
+function AccountSummary({ flow }: { flow: FlowContext | null }) {
+  if (!flow?.account_hint) {
+    return null
+  }
+
+  const displayName =
+    flow.account_hint.display_name?.trim() || flow.account_hint.email?.trim() || "Linked account"
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
+      <div className="flex items-center gap-3">
+        <div className="rounded-2xl bg-white p-2 text-primary shadow-sm">
+          <UserRound className="size-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-900">Known account</p>
+          <p className="mt-1 truncate text-sm text-slate-600">{displayName}</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-6 text-muted-foreground">
+        This request already knows the linked identity hint for the current sign-in session.
+      </p>
+    </div>
+  )
+}
+
 function FlowSnapshot({ flow }: { flow: FlowContext }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -695,7 +784,7 @@ function FlowSnapshot({ flow }: { flow: FlowContext }) {
       <SnapshotItem label="Scopes" value={flow.requested_scopes.join(" ") || "none"} />
       <SnapshotItem
         label="Account hint"
-        value={flow.account_hint?.email ?? flow.account_hint?.display_name ?? "none"}
+        value={flow.account_hint?.display_name ?? flow.account_hint?.email ?? "none"}
       />
     </div>
   )
@@ -710,8 +799,8 @@ function ScopeList({ scopes }: { scopes: string[] }) {
     openid: "Finish secure sign-in.",
     email: "View your verified email address.",
     profile: "View your basic profile details.",
-    "trading.read": "Read trading information associated with your account.",
-    "trading.write": "Create and manage trading actions on your behalf.",
+    "trading.read": "Read information associated with your account.",
+    "trading.write": "Create and manage actions on your behalf.",
   }
 
   return (
@@ -818,7 +907,7 @@ function FooterBand() {
       <CardContent className="flex flex-col gap-4 p-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="font-medium text-slate-900">Hosted by {appConfig.appName}</div>
-          <div>Secure sign-in, approval, and verification in one place.</div>
+          <div>Secure sign-in, approval, verification, and session choices in one place.</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">Google</Badge>
