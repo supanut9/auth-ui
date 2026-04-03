@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react"
-import type { ReactNode } from "react"
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,6 +14,21 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react"
+import type { ReactNode } from "react"
+import { useEffect, useState } from "react"
+
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 
 import { appConfig } from "./config"
 import type { FlowActionResult, FlowContext, FlowStage } from "./flow"
@@ -32,18 +45,6 @@ import {
   verifyOtp,
 } from "./flow"
 import { getUiRoute, type UiRoute } from "./routes"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 
 type FlowPanelState =
   | { status: "loading"; flow: null; error: null }
