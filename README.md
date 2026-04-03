@@ -33,6 +33,6 @@ Phase-1 hosted login and consent UI for the platform.
 
 Root planning docs remain authoritative for phase 1:
 
-- `../docs/auth-flow.md`
-- `../docs/phase-1-ui-contract.md`
-- `../docs/phase-1-endpoints.md`
+- `../docs/auth/auth-flow.md`
+- `../docs/auth/phase-1-ui-contract.md`
+- `../docs/auth/phase-1-endpoints.md`

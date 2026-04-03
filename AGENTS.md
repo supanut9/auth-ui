@@ -27,9 +27,9 @@ Those belong to `auth-server`.
 
 ## Read Before Coding
 
-- `../docs/phase-1-ui-contract.md`
-- `../docs/phase-1-endpoints.md`
-- `../docs/auth-flow.md`
+- `../docs/auth/phase-1-ui-contract.md`
+- `../docs/auth/phase-1-endpoints.md`
+- `../docs/auth/auth-flow.md`
 
 ## UI Rules
 
