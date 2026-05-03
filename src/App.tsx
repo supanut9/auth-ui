@@ -653,7 +653,9 @@ function ErrorPage({
 }: PageProps & {
   detail: string | null
 }) {
-  const isExpired = flow?.stage === "expired"
+  const isExpired =
+    flow?.stage === "expired" ||
+    detail?.toLowerCase().includes("sign-in request expired") === true
   const isFailed = flow?.stage === "failed"
 
   return (
@@ -699,11 +701,15 @@ function ErrorPage({
           <Button
             type="button"
             onClick={() => {
+              if (isExpired) {
+                window.location.assign(appConfig.defaultAppLoginUrl)
+                return
+              }
               window.location.reload()
             }}
           >
             <RotateCcw className="size-4" />
-            Retry current page
+            {isExpired ? "Start new sign-in" : "Retry current page"}
           </Button>
         </div>
       </div>

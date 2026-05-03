@@ -1,6 +1,7 @@
 export type AppConfig = {
   authServerUrl: string
   authUiUrl: string
+  defaultAppLoginUrl: string
   appName: string
 }
 
@@ -27,6 +28,10 @@ function createAppConfig(): AppConfig {
     'VITE_AUTH_UI_URL',
   )
   const appName = readEnv('VITE_APP_NAME', 'auth-ui').trim()
+  const defaultAppLoginUrl = normalizeUrl(
+    readEnv('VITE_DEFAULT_APP_LOGIN_URL', 'http://localhost:3007/auth/login?force=1'),
+    'VITE_DEFAULT_APP_LOGIN_URL',
+  )
 
   if (!appName) {
     throw new Error('Invalid VITE_APP_NAME: must not be empty')
@@ -35,6 +40,7 @@ function createAppConfig(): AppConfig {
   return {
     authServerUrl,
     authUiUrl,
+    defaultAppLoginUrl,
     appName,
   }
 }

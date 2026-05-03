@@ -63,7 +63,7 @@ export type FlowLoadResult =
     }
 
 async function callJson<T>(path: string, init?: RequestInit): Promise<T> {
- const response = await fetch(`${appConfig.authServerUrl}${path}`, {
+  const response = await fetch(`${appConfig.authServerUrl}${path}`, {
     credentials: 'include',
     headers: {
       ...(init?.headers ?? {}),
@@ -72,7 +72,16 @@ async function callJson<T>(path: string, init?: RequestInit): Promise<T> {
   })
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`)
+    const data = (await response.json().catch(() => null)) as
+      | { error?: string; error_description?: string; message?: string }
+      | null
+
+    throw new Error(
+      flowErrorMessage(
+        response.status,
+        data?.error_description ?? data?.message ?? data?.error,
+      ),
+    )
   }
 
   return (await response.json()) as T
@@ -115,7 +124,10 @@ async function callAction(
     return {
       ok: false,
       message:
-        data?.error_description ?? data?.message ?? `Request failed: ${response.status}`,
+        flowErrorMessage(
+          response.status,
+          data?.error_description ?? data?.message ?? data?.error,
+        ),
     }
   } catch (error) {
     return {
@@ -124,6 +136,19 @@ async function callAction(
         error instanceof Error ? error.message : 'Unable to contact auth-server',
     }
   }
+}
+
+function flowErrorMessage(status: number, error?: string): string {
+  if (status === 410 || error === 'expired_request') {
+    return 'This sign-in request expired. Start sign-in again from the application.'
+  }
+  if (status === 404 || error === 'not_found') {
+    return 'This sign-in request no longer exists. Start sign-in again from the application.'
+  }
+  if (status === 409 || error === 'invalid_stage') {
+    return 'This sign-in request is no longer on this step. Start sign-in again from the application.'
+  }
+  return error ?? `Request failed: ${status}`
 }
 
 export async function loadFlowContext(
