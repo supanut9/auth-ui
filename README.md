@@ -21,6 +21,7 @@ Phase-1 hosted login and consent UI for the platform.
 - invalid browser redirect URLs fail fast during app config initialization
 - keep `VITE_AUTH_SERVER_URL`, `VITE_AUTH_UI_URL`, and `VITE_APP_NAME` set for deploys
 - `vercel.json` is included so Vercel serves the built SPA and rewrites deep routes like `/login`, `/consent`, and `/logout` back to `index.html`
+- `.env.vercel.example` provides the production-shaped Vercel env names
 
 ## Responsibilities
 
