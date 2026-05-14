@@ -5,9 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prepare": "husky",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "check": "eslint . && tsc -b && vite build",
+    "security:semgrep": "semgrep scan --config auto --error .",
+    "security:trivy": "trivy filesystem --scanners vuln --severity HIGH,CRITICAL --include-dev-deps --skip-dirs node_modules --skip-dirs dist --exit-code 1 .",
+    "check:pre-commit": "bun run security:semgrep",
+    "check:pre-push": "bun run security:semgrep && bun run security:trivy",
     "smoke": "bun scripts/smoke.ts",
     "preview": "vite preview --host 0.0.0.0 --port 3005 --strictPort"
   },
@@ -34,8 +39,9 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^17.4.0",
+    "husky": "^9.1.7",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.3"
+    "vite": "8.0.5"
   }
 }
